@@ -1,0 +1,15 @@
+CREATE TABLE Logins (
+	UserID	INTEGER,
+	Username	TEXT UNIQUE,
+	Password	TEXT,
+	Date_Created	TEXT,
+	PRIMARY KEY("UserID"),
+	FOREIGN KEY("UserID") REFERENCES "Names"("UserID")
+) WITHOUT ROWID
+
+CREATE TABLE "Names" (
+	"UserID"	INTEGER,
+	"First_name"	TEXT,
+	"Last_name"	TEXT,
+	PRIMARY KEY("UserID")
+) WITHOUT ROWID
