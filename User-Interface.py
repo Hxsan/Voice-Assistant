@@ -267,6 +267,12 @@ class Register(QWidget):
         self.Create_User.setObjectName("Create_User")
         self.Create_User.clicked.connect(self.reg)
 
+        self.Clear_fields = QtWidgets.QPushButton(self)
+        self.Clear_fields.setGeometry(QtCore.QRect(300, 270, 75, 23))
+        self.Clear_fields.setObjectName("Clear_fields")
+        self.Clear_fields.setText("Clear Fields")
+        self.Clear_fields.clicked.connect(self.clearall)
+
         self.Invalid = QtWidgets.QLabel(self)
         self.Invalid.setGeometry(QtCore.QRect(0,310,401,20))
         self.Invalid.setText(" ")
@@ -314,8 +320,17 @@ class Register(QWidget):
                 cur.execute(f'INSERT INTO Logins VALUES(null, "{self.Username_input.text()}", "{passhash.hexdigest()}", "{datetime.date.today()}");')
                 cur.execute(f'INSERT INTO Names VALUES(null, "{self.First_name_input.text()}", "{self.Last_name_input.text()}", "{self.email.text()}");')
                 con.commit()
+
         else:
             self.Invalid.setText("Error: Please Accept the terms and conditions")
+        
+    def clearall(self):
+        self.email.clear()
+        self.Username_input.clear()
+        self.Password_input.clear()
+        self.First_name_input.clear()
+        self.Last_name_input.clear()
+
 
 #----------END OF CLASS----------
 
