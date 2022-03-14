@@ -461,12 +461,15 @@ class VoiceAssistant(QWidget):
     def Microphone_sr(self):
         r = sr.Recognizer()
         mic = sr.Microphone()
+        
+        dict = microphone(r,mic)
 
-        self.Outputcont.append("User Said:" + microphone(r,mic)['transcription'])
+        self.Outputcont.append("User Said:" + dict['transcription'])
 
-        for val in range(len(microphone(r,mic)['Reactive_Val'])):
-            curr = ['Reactive_Val'][val]
-            self.ReactiveVoice.setProperty(curr)
+        for val in range(len(dict['Reactive_Val'])):
+            sl = dict['Reactive_Val']
+            curr = sl[val]
+            self.ReactiveVoice.setProperty("value", curr)
 
 #----------END OF CLASS---------
 
