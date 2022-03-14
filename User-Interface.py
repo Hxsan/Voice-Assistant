@@ -160,25 +160,34 @@ class microphone_obj(object):
         r = sr.Recognizer()
         mic = sr.Microphone()
 
+        r.dynamic_energy_threshold = True
+        
         output= {
             'transcription':'None',
-            'Errors': None
+            'Errors': None,
+            'Reactive_Val': 0 
         }
 
         with mic as source:
             try:
-                audio = r.recognize_google(r.listen(source)) # ---> can be condensed into one line
-                output['transcription'] = audio
+                print("speak now")
+                listen = r.listen(source) # ---> can be condensed into one line
+                output['transcription'] = r.recognize_google(listen)
 
             except sr.UnknownValueError:
                 print("I didn't catch that! Please try again.")
                 output['Errors'] = "UnknownValueError"
                 output['transcription'] = "null"
         
+        #Recording the pitch of the user using an integer list
+        bitarr = listen.get_raw_data(convert_rate= 2, convert_width= 2)
+        intarr = []
+        for countA in range(len(bitarr)):
+            intarr.append(bitarr[countA])
+
+        output['Reactive_Val'] = intarr
         return output
 #----------END OF CLASS----------
-
-microphone = microphone_obj() #Instatiate microphone class
 
 #----------Registration Page----------
 class Register(QWidget):
@@ -403,6 +412,8 @@ class MainPage(QWidget):
         self.Ts.show()
 #----------END OF CLASS----------
 
+microphone = microphone_obj() #Instatiate microphone class
+
 #----------Voice Assistant UI----------
 class VoiceAssistant(QWidget):
     def __init__(self):
@@ -452,6 +463,11 @@ class VoiceAssistant(QWidget):
         mic = sr.Microphone()
 
         self.Outputcont.append("User Said:" + microphone(r,mic)['transcription'])
+
+        for i in range(len(microphone(r,mic)['Reactive_Val'])):
+            curr = ['Reactive_Val'][i]
+            #continue later
+
 #----------END OF CLASS---------
 
 
