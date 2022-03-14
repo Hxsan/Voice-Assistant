@@ -148,6 +148,10 @@ class LoginPage(QMainWindow):
         self.WelcomeLabel.setText("Welcome To VoiceAI: Login")
         self.WelcomeLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.WelcomeLabel.setStyleSheet('''font-size: 24px''')
+
+        # Watermarking the Login Fields
+        self.Username_input.setPlaceholderText("Enter your Username")
+        self.Password_input.setPlaceholderText("Enter a Valid Password")
 #----------END OF CLASS----------
 
 #----------Microphone Object----------
@@ -289,6 +293,13 @@ class Register(QWidget):
         self.T_and_C.setText("Agree to the collection of data for the sole creation of a user account.")
         self.email_label.setText("Email:")
         self.Create_User.setText("Create User!")
+
+        # Watermark on the field boxes
+        self.email.setPlaceholderText("Enter a valid email")
+        self.Username_input.setPlaceholderText("Username between 5 and 15 characters")
+        self.Password_input.setPlaceholderText("Password more than 8 characters")
+        self.First_name_input.setPlaceholderText("Enter your First name")
+        self.Last_name_input.setPlaceholderText("Enter your Last name")
 
     def reg(self):
         check = "@" in list(self.email.text())
