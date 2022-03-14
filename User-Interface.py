@@ -464,9 +464,9 @@ class VoiceAssistant(QWidget):
 
         self.Outputcont.append("User Said:" + microphone(r,mic)['transcription'])
 
-        for i in range(len(microphone(r,mic)['Reactive_Val'])):
-            curr = ['Reactive_Val'][i]
-            #continue later
+        for val in range(len(microphone(r,mic)['Reactive_Val'])):
+            curr = ['Reactive_Val'][val]
+            self.ReactiveVoice.setProperty(curr)
 
 #----------END OF CLASS---------
 
@@ -585,7 +585,17 @@ class TwitterScraper(QWidget):
         else:
             self.Retweets.setText(" ")
 
-    
+class Reminders(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(300,400)
+        self.setWindowTitle("Task and Reminders " + vers_no)
+        self.Reminders()
+
+    def Reminders(self):
+        #defede
+        when = "i need to do this"
+
 #----------END OF CLASS----------
 
 def window():
