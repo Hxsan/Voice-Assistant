@@ -585,6 +585,9 @@ class TwitterScraper(QWidget):
         else:
             self.Retweets.setText(" ")
 
+#----------END OF CLASS---------
+
+#---------- Tasks and Reminders + Tax calc ----------
 class Reminders(QWidget):
     def __init__(self):
         super().__init__()
