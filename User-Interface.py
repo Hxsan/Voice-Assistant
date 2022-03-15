@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget # <-- both imports are for the GUI
+from threading import Thread
 
 import sys # <-- Used to manage the windows(open/close windows)
 import speech_recognition as sr # <-- Used to understand speech input
@@ -184,8 +185,9 @@ class microphone_obj(object):
         intarr = []
         for countA in range(len(bitarr)):
             intarr.append(bitarr[countA])
-
+        
         output['Reactive_Val'] = intarr
+
         return output
 #----------END OF CLASS----------
 
@@ -447,7 +449,7 @@ class VoiceAssistant(QWidget):
         self.VoiceActivate.setGeometry(QtCore.QRect(150, 70, 231, 51))
         self.VoiceActivate.setDefault(True)
         self.VoiceActivate.setObjectName("VoiceActivate")
-        self.VoiceActivate.clicked.connect(self.Microphone_sr)
+        self.VoiceActivate.clicked.connect(self.Voice_Active)
 
         #Output box to write down what is being said
         self.Outputcont = QtWidgets.QTextBrowser(self)
@@ -458,7 +460,7 @@ class VoiceAssistant(QWidget):
         self.VoiceInstructions.setText("Press the button below to speak to the voice assistant")
         self.VoiceActivate.setText("Press Me!")
 
-    def Microphone_sr(self):
+    def Microphone(self):
         r = sr.Recognizer()
         mic = sr.Microphone()
         
@@ -466,10 +468,24 @@ class VoiceAssistant(QWidget):
 
         self.Outputcont.append("User Said:" + dict['transcription'])
 
-        for val in range(len(dict['Reactive_Val'])):
-            sl = dict['Reactive_Val']
+    def Reactive_voice(self):
+        intarr = [12,23,56,99,200,156,32,78,99,32,45,66,0]
+
+        for val in range(len(intarr)):
+            sl = intarr
             curr = sl[val]
             self.ReactiveVoice.setProperty("value", curr)
+            time.sleep(0.5)
+    
+    def Voice_Active(self):
+        Voice = Thread(target=self.Microphone)
+        Meter = Thread(target=self.Reactive_voice)
+
+        Voice.start()
+        Meter.start()
+
+        Voice.join()
+        Meter.join()
 
 #----------END OF CLASS---------
 
