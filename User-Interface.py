@@ -155,6 +155,7 @@ class LoginPage(QMainWindow):
         self.Password_input.setPlaceholderText("Enter a Valid Password")
 #----------END OF CLASS----------
 
+"""
 #----------Microphone Object----------
 class microphone_obj(object):
     def __call__(self, r, mic):
@@ -190,7 +191,7 @@ class microphone_obj(object):
 
         return output
 #----------END OF CLASS----------
-
+"""
 #----------Registration Page----------
 class Register(QWidget):
     def __init__(self):
@@ -414,7 +415,7 @@ class MainPage(QWidget):
         self.Ts.show()
 #----------END OF CLASS----------
 
-microphone = microphone_obj() #Instatiate microphone class
+#microphone = microphone_obj() #Instatiate microphone class
 
 #----------Voice Assistant UI----------
 class VoiceAssistant(QWidget):
@@ -423,6 +424,7 @@ class VoiceAssistant(QWidget):
         self.setFixedSize(400,300)
         self.setWindowTitle("Voice Assistant " + vers_no)
         self.Voice_Assistant_UI()
+        self.intarr = []
 
     def Voice_Assistant_UI(self):
 
@@ -431,7 +433,7 @@ class VoiceAssistant(QWidget):
         self.ReactiveVoice.setGeometry(QtCore.QRect(30, 20, 81, 251))
         self.ReactiveVoice.setOrientation(QtCore.Qt.Vertical)
         #Sets the maximum level for the progress bar(Voice detection system)
-        self.ReactiveVoice.setMaximum(255)
+        self.ReactiveVoice.setMaximum(256)
         self.ReactiveVoice.setProperty("value",50)
         #Declaring the Getters for the Voice Assistant
         self.ReactiveVoice.setFormat("")
@@ -449,7 +451,7 @@ class VoiceAssistant(QWidget):
         self.VoiceActivate.setGeometry(QtCore.QRect(150, 70, 231, 51))
         self.VoiceActivate.setDefault(True)
         self.VoiceActivate.setObjectName("VoiceActivate")
-        self.VoiceActivate.clicked.connect(self.Voice_Active)
+        self.VoiceActivate.clicked.connect(lambda: [self.Microphone(),Thread(target=self.Reactive_Voice()).start()])
 
         #Output box to write down what is being said
         self.Outputcont = QtWidgets.QTextBrowser(self)
@@ -463,29 +465,37 @@ class VoiceAssistant(QWidget):
     def Microphone(self):
         r = sr.Recognizer()
         mic = sr.Microphone()
+
+        r.dynamic_energy_threshold = True
         
-        dict = microphone(r,mic)
+        output= {
+            'transcription':'None',
+            'Errors': None,
+            'Reactive_Val': 0 
+        }
 
-        self.Outputcont.append("User Said:" + dict['transcription'])
+        with mic as source:
+            try:
+                print("speak now")
+                listen = r.listen(source) # ---> can be condensed into one line
+                output['transcription'] = r.recognize_google(listen)
 
-    def Reactive_voice(self):
-        intarr = [12,23,56,99,200,156,32,78,99,32,45,66,0]
-
-        for val in range(len(intarr)):
-            sl = intarr
-            curr = sl[val]
-            self.ReactiveVoice.setProperty("value", curr)
-            time.sleep(0.5)
-    
-    def Voice_Active(self):
-        Voice = Thread(target=self.Microphone)
-        Meter = Thread(target=self.Reactive_voice)
-
-        Voice.start()
-        Meter.start()
-
-        Voice.join()
-        Meter.join()
+            except sr.UnknownValueError:
+                print("I didn't catch that! Please try again.")
+                output['Errors'] = "UnknownValueError"
+                output['transcription'] = "null"
+        
+        self.Outputcont.append(f"User Said: {output['transcription']}")
+        
+        #Recording the pitch of the user using an integer list
+        bitarr = listen.get_raw_data(convert_rate= 2, convert_width= 2)
+        for countA in range(len(bitarr)):
+            self.intarr.append(bitarr[countA])
+        
+    def Reactive_Voice(self):
+        for reactive in self.intarr:
+            time.sleep(0.15)
+            self.ReactiveVoice.setProperty("value", reactive)
 
 #----------END OF CLASS---------
 
