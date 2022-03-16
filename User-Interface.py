@@ -414,7 +414,7 @@ class VoiceAssistant(QWidget):
         self.VoiceActivate.setGeometry(QtCore.QRect(150, 70, 231, 51))
         self.VoiceActivate.setDefault(True)
         self.VoiceActivate.setObjectName("VoiceActivate")
-        self.VoiceActivate.clicked.connect(lambda: [self.Microphone(),Thread(target=self.Reactive_Voice()).start()])
+        self.VoiceActivate.clicked.connect(lambda: [Thread(target=self.Microphone()),Thread(target=self.Reactive_Voice()).start()])
 
         #Output box to write down what is being said
         self.Outputcont = QtWidgets.QTextBrowser(self)
@@ -452,7 +452,7 @@ class VoiceAssistant(QWidget):
 
         self.response = output['transcription']
         if self.response != "None":
-            xy = Thread(target=self.Responses).start()
+            Thread(target=self.Responses).start()
 
         self.Outputcont.append(f"Assistant Said: {self.Responses()}")
         self.VoiceActivate.setEnabled(False)
@@ -479,7 +479,7 @@ class VoiceAssistant(QWidget):
             return "No values within the response"
 
         if "open" in test:
-            if ("Msword" in test) or (("Microsoft") and ("Word") in test):
+            if ("Microsoft") and ("Word") in test:
                 os.startfile("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE")
                 return "Opening Word..."
             elif ("PowerPoint" in test):
