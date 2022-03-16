@@ -4,7 +4,7 @@ from threading import Thread
 
 import sys # <-- Used to manage the windows(open/close windows)
 import speech_recognition as sr # <-- Used to understand speech input
-import subprocess # <-- Used to open applications on the system and manage files
+import os # <-- Used to open applications on the system and manage files
 import PyP100 # <-- Used to control smart peripherals and devices
 import sqlite3 # <-- Used to manage and create databases
 import webbrowser # <-- Used as a web based library to visually represent information
@@ -155,43 +155,6 @@ class LoginPage(QMainWindow):
         self.Password_input.setPlaceholderText("Enter a Valid Password")
 #----------END OF CLASS----------
 
-"""
-#----------Microphone Object----------
-class microphone_obj(object):
-    def __call__(self, r, mic):
-        r = sr.Recognizer()
-        mic = sr.Microphone()
-
-        r.dynamic_energy_threshold = True
-        
-        output= {
-            'transcription':'None',
-            'Errors': None,
-            'Reactive_Val': 0 
-        }
-
-        with mic as source:
-            try:
-                print("speak now")
-                listen = r.listen(source) # ---> can be condensed into one line
-                output['transcription'] = r.recognize_google(listen)
-
-            except sr.UnknownValueError:
-                print("I didn't catch that! Please try again.")
-                output['Errors'] = "UnknownValueError"
-                output['transcription'] = "null"
-        
-        #Recording the pitch of the user using an integer list
-        bitarr = listen.get_raw_data(convert_rate= 2, convert_width= 2)
-        intarr = []
-        for countA in range(len(bitarr)):
-            intarr.append(bitarr[countA])
-        
-        output['Reactive_Val'] = intarr
-
-        return output
-#----------END OF CLASS----------
-"""
 #----------Registration Page----------
 class Register(QWidget):
     def __init__(self):
@@ -463,6 +426,7 @@ class VoiceAssistant(QWidget):
         self.VoiceActivate.setText("Press Me!")
 
     def Microphone(self):
+        self.VoiceActivate.setEnabled(True)
         r = sr.Recognizer()
         mic = sr.Microphone()
 
@@ -471,7 +435,6 @@ class VoiceAssistant(QWidget):
         output= {
             'transcription':'None',
             'Errors': None,
-            'Reactive_Val': 0 
         }
 
         with mic as source:
@@ -480,22 +443,51 @@ class VoiceAssistant(QWidget):
                 listen = r.listen(source) # ---> can be condensed into one line
                 output['transcription'] = r.recognize_google(listen)
 
-            except sr.UnknownValueError:
+            except:
                 print("I didn't catch that! Please try again.")
                 output['Errors'] = "UnknownValueError"
                 output['transcription'] = "null"
         
         self.Outputcont.append(f"User Said: {output['transcription']}")
-        
+
+        self.response = output['transcription']
+        if self.response != "None":
+            xy = Thread(target=self.Responses).start()
+
+        self.Outputcont.append(f"Assistant Said: {self.Responses()}")
+        self.VoiceActivate.setEnabled(False)
+
+
         #Recording the pitch of the user using an integer list
         bitarr = listen.get_raw_data(convert_rate= 2, convert_width= 2)
         for countA in range(len(bitarr)):
             self.intarr.append(bitarr[countA])
         
     def Reactive_Voice(self):
-        for reactive in self.intarr:
-            time.sleep(0.15)
-            self.ReactiveVoice.setProperty("value", reactive)
+        try:
+            for reactive in self.intarr:
+                time.sleep(0.15)
+                self.ReactiveVoice.setProperty("value", reactive)
+        finally:
+            self.ReactiveVoice.setValue(0)
+            self.VoiceActivate.setEnabled(True)
+    
+    def Responses(self):
+        try:
+            test = self.response.split(" ")
+        except:
+            return "No values within the response"
+
+        if "open" in test:
+            if ("Msword" in test) or (("Microsoft") and ("Word") in test):
+                os.startfile("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE")
+                return "Opening Word..."
+            elif ("PowerPoint" in test):
+                os.startfile("C:/Program Files/Microsoft Office/root/Office16/POWERPNT.EXE")
+                return "Opening Powerpoint..."
+
+
+
 
 #----------END OF CLASS---------
 
