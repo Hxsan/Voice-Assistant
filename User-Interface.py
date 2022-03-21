@@ -11,7 +11,7 @@ import sqlite3 # <-- Used to manage and create databases
 import webbrowser # <-- Used as a web based library to visually represent information
 import twilio # <-- Used to send messages via SMS
 import pyttsx3 # <-- Used to convert text to speech
-import tweepy
+import tweepy # <-- Twitter Scraping Library to harvest information from a page
 import datetime # <-- Used to check the date and time
 import time # <-- Will be used for delays 
 import requests # <-- Used for accessing web information and relaying it to the program
@@ -226,6 +226,9 @@ class Register(QWidget):
         """
             Parameters for the user account to be created
         """
+        self.email = QtWidgets.QLineEdit(self)
+        self.email.setGeometry(QtCore.QRect(130,190,241,20))
+        self.email.setObjectName("email")
         
         self.T_and_C = QtWidgets.QRadioButton(self)
         self.T_and_C.setGeometry(QtCore.QRect(20, 240, 361, 17))
@@ -235,10 +238,6 @@ class Register(QWidget):
         self.email_label.setGeometry(QtCore.QRect(40,190,71,16))
         self.email_label.setStyleSheet(''' font-size: 12px ''')
         self.email_label.setObjectName("email_label")
-
-        self.email = QtWidgets.QLineEdit(self)
-        self.email.setGeometry(QtCore.QRect(130,190,241,20))
-        self.email.setObjectName("email")
 
         self.Create_User = QtWidgets.QPushButton(self)
         self.Create_User.setGeometry(QtCore.QRect(140, 270, 111, 31))
@@ -258,14 +257,20 @@ class Register(QWidget):
         self.Invalid.setAlignment(QtCore.Qt.AlignCenter)
         self.Invalid.setObjectName("Invalid")
 
-        # Text entries for each label/ entry
+        """
+        Label Predefined Text
+        """
+
         self.Register_title.setText("Register for VoiceAI")
+
         self.First_name.setText("First Name:")
         self.Last_name.setText("Last Name:")
         self.username.setText("Username:")
         self.password.setText("Password:")
+
         self.T_and_C.setText("Agree to the collection of data for the sole creation of a user account.")
         self.email_label.setText("Email:")
+        
         self.Create_User.setText("Create User!")
 
         # Watermark on the field boxes
@@ -450,7 +455,10 @@ class VoiceAssistant(QWidget):
         self.Outputcont.setGeometry(QtCore.QRect(140, 140, 251, 121))
         self.Outputcont.setObjectName("Outputcont")
 
-        #Statements for the label containers within the class
+        """
+        Label Predefined Text
+        """
+
         self.VoiceInstructions.setText("Press the button below to speak to the voice assistant")
         self.VoiceActivate.setText("Press Me!")
 
@@ -522,8 +530,20 @@ class VoiceAssistant(QWidget):
             elif ("PowerPoint" in test):
                 os.startfile("C:/Program Files/Microsoft Office/root/Office16/POWERPNT.EXE")
                 return "Opening Powerpoint..."
-        
-    def Reminders(self):
+            elif ("Onenote" or "OneNote") in test:
+                os.startfile("C:/Program Files/Microsoft Office/root\Office16/ONENOTE.EXE")
+                return "Opening OneNote..."
+            elif ("Excel") in test:
+                os.startfile("C:/Program Files/Microsoft Office/root/Office16/EXCEL.EXE")
+                return "Opening Excel"
+            elif ("Spotify") in test:
+                os.startfile("C:/Users/Hasan/AppData/Local/Microsoft/WindowsApps/Spotify.exe")
+            elif ("Chrome") in test:
+                os.startfile("C:/Program Files/Google/Chrome/Application/chrome.exe")
+            else:
+                return "Program not found on system"
+
+    def Reminders_set(self):
 
         return "it works bruh"
 
@@ -636,16 +656,21 @@ class TwitterScraper(QWidget):
         self.Retweets.setAlignment(QtCore.Qt.AlignCenter)
         self.Retweets.setStyleSheet(''' color: green; ''')
 
+        """
+        Label Predefined Text
+        """
 
-        #Text entries for all the buttons and labels
         self.Handle.setText("Twitter Handle : ")
         self.Search_Query.setText("Search Query:")
+
         self.Submit_req.setText("Submit request")
         self.req_history.setText("Show request history")
         self.max_results_label.setText("Maximum results:  ")
+
         self.Search_by.setText("Search By:")
         self.by_TwitterUser.setText("By Twitter User")
         self.by_TwitterAll.setText("The Whole of Twitter")
+
         self.Exclusion.setText("Exclude: ")
         self.exclu_Retweets.setText("Retweets")
 
@@ -713,15 +738,36 @@ class TwitterScraper(QWidget):
         if id == None:
             self.Output_Window.append("Handle Invalid or Blank")
         else:
-            #tweets = self.client.get_users_tweets(id = id, max_results = f"{max_results}", exclude = f"{exclusions}")
-            self.Output_Window.append("\n"+"\/"*78)
-            for tweet in tweepy.Paginator(self.client.get_users_tweets, int(id), exclude = exclusions, max_results = 100).flatten(limit = max_results):
-                self.Output_Window.append(f"\n{tweet}")
-            
-            self.clearEntries()
+            try:
+                self.Output_Window.append("\n"+"\/"*78)
+                for tweet in tweepy.Paginator(self.client.get_users_tweets, int(id), exclude = exclusions, max_results = 100).flatten(limit = max_results):
+                    self.Output_Window.append(f"\n{tweet}")
+                    self.clearEntries()
+            except tweepy.TweepyException:
+                self.Output_Window.append("Request Invalid or API Tweet Cap Reached")
     
     def all_twitter(self):
-        self.Output_Window.append("You chose the wrong one fool")
+        try:
+            query = self.Query_box.text()
+        except:
+            self.Output_Window.append("API cannot parse query")
+        
+        max_results = 10
+        try:
+            if int(self.max_results.text()) < 10:
+                self.Output_Window.append("\nMax num too low, defaulting to 10")
+            elif int(self.max_results.text()) > 300:
+                self.Output_Window.append("\nmax num too high, defaulting to 10")
+            else:
+                max_results = int(self.max_results.text())
+        
+        except ValueError:
+            self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
+
+        self.Output_Window.append("\n"+"\/"*78)
+
+        for tweet in tweepy.Paginator(self.client.search_recent_tweets, query, max_results = 100).flatten(limit = max_results):
+            self.Output_Window.append(f"\n{tweet}")
     
     def check_type(self):
 
@@ -746,13 +792,146 @@ class TwitterScraper(QWidget):
 class Reminders(QWidget):
     def __init__(self):
         super().__init__()
-        self.setFixedSize(300,400)
+        self.setFixedSize(842, 415)
         self.setWindowTitle("Task and Reminders " + vers_no)
         self.Reminders()
+        self.TaxCalculator()
 
     def Reminders(self):
-        #afwefyhuwagfweafewalfawlfcyg 
-        do = "this laters"
+        self.Vert_Divider = QtWidgets.QFrame(self)
+        self.Vert_Divider.setGeometry(QtCore.QRect(440, 0, 20, 411))
+        self.Vert_Divider.setFrameShape(QtWidgets.QFrame.VLine)
+        self.Vert_Divider.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.Vert_Divider.setObjectName("Vert_Divider")
+
+        self.Reminders_rect = QtWidgets.QTextBrowser(self)
+        self.Reminders_rect.setGeometry(QtCore.QRect(10, 10, 431, 391))
+        self.Reminders_rect.setObjectName("Reminders_rect")
+    
+    def TaxCalculator(self):
+        self.entry_frame = QtWidgets.QFrame(self)
+        self.entry_frame.setGeometry(QtCore.QRect(480, 90, 341, 111))
+        self.entry_frame.setFrameShape(QtWidgets.QFrame.Box)
+        self.entry_frame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.entry_frame.setLineWidth(2)
+        self.entry_frame.setObjectName("entry_frame")
+
+
+        self.Tax_Frame = QtWidgets.QFrame(self)
+        self.Tax_Frame.setGeometry(QtCore.QRect(480, 30, 341, 51))
+        self.Tax_Frame.setFrameShape(QtWidgets.QFrame.Box)
+        self.Tax_Frame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.Tax_Frame.setLineWidth(2)
+        self.Tax_Frame.setObjectName("Tax_Frame")
+
+        self.Tax_BillsLabel = QtWidgets.QLabel(self.Tax_Frame)
+        self.Tax_BillsLabel.setGeometry(QtCore.QRect(0, -1, 341, 51))
+        self.Tax_BillsLabel.setStyleSheet(''' font-size: 20px; ''')
+        self.Tax_BillsLabel.setAlignment(QtCore.Qt.AlignCenter)
+
+
+        self.PPA = QtWidgets.QLabel(self)
+        self.PPA.setGeometry(QtCore.QRect(480, 220, 121, 16))
+        self.PPA.setObjectName("PPA")
+        self.PPA.setStyleSheet(''' font-size: 12px; ''')
+        
+        self.per5_tip = QtWidgets.QLabel(self)
+        self.per5_tip.setGeometry(QtCore.QRect(500, 250, 61, 16))
+        self.per5_tip.setObjectName("per5_tip")
+        self.per5_tip.setStyleSheet(''' font-size: 12px; ''')
+
+        self.per10_tip = QtWidgets.QLabel(self)
+        self.per10_tip.setGeometry(QtCore.QRect(500, 280, 61, 16))
+        self.per10_tip.setObjectName("per10_tip")
+        self.per10_tip.setStyleSheet(''' font-size: 12px; ''')
+
+
+        self.cust_tip = QtWidgets.QLabel(self)
+        self.cust_tip.setGeometry(QtCore.QRect(500, 310, 101, 16))
+        self.cust_tip.setObjectName("cust_tip")
+        self.cust_tip.setStyleSheet(''' font-size: 12px; ''')
+
+        self.cust_tip_Entry = QtWidgets.QLineEdit(self)
+        self.cust_tip_Entry.setGeometry(QtCore.QRect(630, 310, 113, 20))
+        self.cust_tip_Entry.setObjectName("cust_tip_Entry")
+
+        self.cust_tip_Output = QtWidgets.QLabel(self)
+        self.cust_tip_Output.setGeometry(QtCore.QRect(500, 340, 301, 31))
+        self.cust_tip_Output.setObjectName("cust_tip_Output")
+        self.cust_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+        self.cust_tip_Output.setAlignment(QtCore.Qt.AlignCenter)
+
+        self.cust_submit = QtWidgets.QPushButton(self)
+        self.cust_submit.setGeometry(QtCore.QRect(750, 310, 51, 21))
+        self.cust_submit.setObjectName("cust_Submit")
+
+        self.Tip_entry = QtWidgets.QLineEdit(self)
+        self.Tip_entry.setGeometry(QtCore.QRect(630, 310, 113, 20))
+        self.Tip_entry.setObjectName("Tip_entry")
+        self.Tip_entry.setStyleSheet(''' font-size: 12px; ''')
+
+
+        self.PPA_Output = QtWidgets.QLabel(self)
+        self.PPA_Output.setGeometry(QtCore.QRect(630, 220, 91, 16))
+        self.PPA_Output.setObjectName("PPA_Output")
+        self.PPA_Output.setStyleSheet(''' font-size: 12px; ''')
+
+        self.per5_tip_Output = QtWidgets.QLabel(self)
+        self.per5_tip_Output.setGeometry(QtCore.QRect(630, 250, 91, 16))
+        self.per5_tip_Output.setObjectName("per5_tip_Output")
+        self.per5_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+        
+        self.per10_tip_Output = QtWidgets.QLabel(self)
+        self.per10_tip_Output.setGeometry(QtCore.QRect(630, 280, 91, 16))
+        self.per10_tip_Output.setObjectName("per10_tip_Output")
+        self.per10_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+
+
+        self.Total = QtWidgets.QLabel(self.entry_frame)
+        self.Total.setGeometry(QtCore.QRect(10, 10, 151, 21))
+        self.Total.setObjectName("Total")
+        self.Total.setStyleSheet(''' font-size: 12px; ''')
+
+        self.Total_Entry = QtWidgets.QLineEdit(self.entry_frame)
+        self.Total_Entry.setGeometry(QtCore.QRect(170, 10, 141, 21))
+        self.Total_Entry.setObjectName("Total_Entry")
+
+        self.Number_Of_People = QtWidgets.QLabel(self.entry_frame)
+        self.Number_Of_People.setGeometry(QtCore.QRect(10, 40, 121, 31))
+        self.Number_Of_People.setObjectName("Number_Of_People")
+        self.Number_Of_People.setStyleSheet(''' font-size: 12px; ''')
+        self.Number_Of_People.setWordWrap(True)
+        self.Number_Of_People.setAlignment(QtCore.Qt.AlignCenter)
+
+        self.No_of_People_Entry = QtWidgets.QLineEdit(self.entry_frame)
+        self.No_of_People_Entry.setGeometry(QtCore.QRect(170, 40, 113, 20))
+        self.No_of_People_Entry.setObjectName("No_of_People_Entry")
+
+        self.Process_Val = QtWidgets.QPushButton(self.entry_frame)
+        self.Process_Val.setGeometry(QtCore.QRect(100, 80, 131, 23))
+        self.Process_Val.setObjectName("Process_Val")
+
+        """
+        Label Predefined Text
+        """
+        self.PPA.setText("Per Person Amount: ")
+
+        self.per5_tip.setText("5% Tip:")
+        self.per10_tip.setText("10% Tip:")
+        self.cust_tip.setText("Custom Tip (%):")
+
+        self.Tax_BillsLabel.setText("Tax/Bills Calculator")
+
+        self.Total.setText("Enter the Total Amount")
+        self.Number_Of_People.setText("Enter the number of people involved: ")
+        self.Process_Val.setText("Process Values")
+
+        self.PPA_Output.setText("-~-")
+        self.per5_tip_Output.setText("-~-")
+        self.per10_tip_Output.setText("-~-")
+
+        self.cust_submit.setText("Submit")
+        self.cust_tip_Output.setText(" Output Will Be Here ")
 
 #----------END OF CLASS----------
 
