@@ -6,10 +6,9 @@ from threading import Thread  # <-- Used to multithread tasks/ run simultaneousl
 import sys # <-- Used to manage the windows(open/close windows)
 import speech_recognition as sr # <-- Used to understand speech input
 import os # <-- Used to open applications on the system and manage files
-import PyP100 # <-- Used to control smart peripherals and devices
+from PyP100 import PyL530 # <-- Used to control smart peripherals and devices
 import sqlite3 # <-- Used to manage and create databases
 import webbrowser # <-- Used as a web based library to visually represent information
-import twilio # <-- Used to send messages via SMS
 import pyttsx3 # <-- Used to convert text to speech
 import tweepy # <-- Twitter Scraping Library to harvest information from a page
 import datetime # <-- Used to check the date and time
@@ -50,6 +49,12 @@ cur.execute('''CREATE TABLE IF NOT EXISTS Names(
     Email TEXT UNIQUE
     );''')
 
+cur.execute('''CREATE TABLE IF NOT EXISTS Reminders(
+    UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username TEXT,
+    Reminder TEXT
+    );''')
+
 con.commit()
 
 #----------Login Page (Finished)----------
@@ -58,7 +63,7 @@ class LoginPage(QMainWindow):
     def __init__(self):
         super(LoginPage, self).__init__()
         self.setFixedSize(501,460)
-        self.setWindowTitle("VoiceAI - Login " + vers_no) 
+        self.setWindowTitle("VoiceAI - Login " + vers_no)
         self.Login()
 
     def Sign_in(self):
@@ -72,7 +77,7 @@ class LoginPage(QMainWindow):
             passhash.update(self.Password_input.text().encode())
 
             if Username == self.Username_input.text() and Hash == passhash.hexdigest():
-                self.w = MainPage()
+                self.w = MainPage(self.Username_input.text())
                 self.w.show()
                 self.hide()
         
@@ -81,7 +86,6 @@ class LoginPage(QMainWindow):
 
         except:
             self.validation_statement.setText("Login is not recognised within the database")
-
     
     def register(self):
         self.reg = Register()
@@ -324,12 +328,34 @@ class Register(QWidget):
 
 #----------END OF CLASS----------
 
+#---------- Reactive bar object ----------
+
+class update_Progress(QObject):
+    complete = pyqtSignal()
+    incremental = pyqtSignal(int)
+
+    def run(self):
+        r = sr.Recognizer()
+        mic = sr.Microphone()
+
+        with mic as source:
+            sound = r.listen(source)
+            one = sound.get_raw_data(convert_rate=2,convert_width=2)
+            for i in range(len(one)):
+                curr = one[i]
+                time.sleep(0.15)
+                self.incremental.emit(curr)
+            self.complete.emit()
+
+#---------- End of Object ----------
+
 #----------Main Page (UNFINISHED)-----------
 class MainPage(QWidget):
-    def __init__(self):
+    def __init__(self, user):
         super().__init__()
+        self.username = user
+        self.setWindowTitle(f"VoiceAI - Main Page {vers_no} - Username: {self.username}")
         self.setFixedSize(720, 520)
-        self.setWindowTitle("VoiceAI - Main Page " + vers_no)
         self.SplashScreen()
 
     def SplashScreen(self):
@@ -381,560 +407,625 @@ class MainPage(QWidget):
         self.reminders.clicked.connect(self.reminder)
         
     def assistant(self):
-        self.Va = VoiceAssistant()
+        self.Va = self.VoiceAssistant(self.username)
         self.Va.show()
 
     def scraper(self):
-        self.Ts = TwitterScraper()
+        self.Ts = self.TwitterScraper(self.username)
         self.Ts.show()
     
     def reminder(self):
-        self.Tr = Reminders()
+        self.Tr = self.Reminders(self.username)
         self.Tr.show()
-#----------END OF CLASS----------
-
-#---------- Reactive bar object ----------
-
-class update_Progress(QObject):
-    complete = pyqtSignal()
-    incremental = pyqtSignal(int)
-
-    def run(self):
-        r = sr.Recognizer()
-        mic = sr.Microphone()
-
-        with mic as source:
-            sound = r.listen(source)
-            one = sound.get_raw_data(convert_rate=2,convert_width=2)
-            for i in range(len(one)):
-                curr = one[i]
-                time.sleep(0.15)
-                self.incremental.emit(curr)
-            self.complete.emit()
-
-#---------- End of Object ----------
+#---------- END OF CLASS ----------
 
 #----------Voice Assistant UI----------
-class VoiceAssistant(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setFixedSize(400,300)
-        self.setWindowTitle("Voice Assistant " + vers_no)
-        self.Voice_Assistant_UI()
-        self.intarr = []
+    class VoiceAssistant(QWidget):
+        def __init__(self, user):
+            super().__init__()
+            self.username = user
+            self.setFixedSize(400,300)
+            self.setWindowTitle(f"Voice Assistant {vers_no} - Username: {self.username}")
+            self.Voice_Assistant_UI()
 
-    def Voice_Assistant_UI(self):
+            self.l530 = PyL530.L530("192.168.1.75", "hasanahmed2004@outlook.com", "Hasan123")
+            self.l530.handshake()
+            self.l530.login()
 
-        #Voice Sensitivity Meter, Detects Loudness
-        self.ReactiveVoice = QtWidgets.QProgressBar(self)
-        self.ReactiveVoice.setGeometry(QtCore.QRect(30, 20, 81, 251))
-        self.ReactiveVoice.setOrientation(QtCore.Qt.Vertical)
-        #Sets the maximum level for the progress bar(Voice detection system)
-        self.ReactiveVoice.setMaximum(256)
-        self.ReactiveVoice.setProperty("value",50)
-        #Declaring the Getters for the Voice Assistant
-        self.ReactiveVoice.setFormat("")
-        self.ReactiveVoice.setObjectName("ReactiveVoice")
+        def Voice_Assistant_UI(self):
 
-        #Instructions on how to use the GUI for the user
-        self.VoiceInstructions = QtWidgets.QLabel(self)
-        self.VoiceInstructions.setGeometry(QtCore.QRect(150, 20, 231, 41))
-        self.VoiceInstructions.setAlignment(QtCore.Qt.AlignCenter)
-        self.VoiceInstructions.setWordWrap(True)
-        self.VoiceInstructions.setObjectName("VoiceInstructions")
+            #Voice Sensitivity Meter, Detects Loudness
+            self.ReactiveVoice = QtWidgets.QProgressBar(self)
+            self.ReactiveVoice.setGeometry(QtCore.QRect(30, 20, 81, 251))
+            self.ReactiveVoice.setOrientation(QtCore.Qt.Vertical)
+            #Sets the maximum level for the progress bar(Voice detection system)
+            self.ReactiveVoice.setMaximum(256)
+            self.ReactiveVoice.setProperty("value",50)
+            #Declaring the Getters for the Voice Assistant
+            self.ReactiveVoice.setFormat("")
+            self.ReactiveVoice.setObjectName("ReactiveVoice")
 
-        #Activating the voice assistant
-        self.VoiceActivate = QtWidgets.QPushButton(self)
-        self.VoiceActivate.setGeometry(QtCore.QRect(150, 70, 231, 51))
-        self.VoiceActivate.setDefault(True)
-        self.VoiceActivate.setObjectName("VoiceActivate")
-        self.VoiceActivate.clicked.connect(lambda: [Thread(target=self.Microphone()).start(),self.Reactive_Voice()])
+            #Instructions on how to use the GUI for the user
+            self.VoiceInstructions = QtWidgets.QLabel(self)
+            self.VoiceInstructions.setGeometry(QtCore.QRect(150, 20, 231, 41))
+            self.VoiceInstructions.setAlignment(QtCore.Qt.AlignCenter)
+            self.VoiceInstructions.setWordWrap(True)
+            self.VoiceInstructions.setObjectName("VoiceInstructions")
 
-        #Output box to write down what is being said
-        self.Outputcont = QtWidgets.QTextBrowser(self)
-        self.Outputcont.setGeometry(QtCore.QRect(140, 140, 251, 121))
-        self.Outputcont.setObjectName("Outputcont")
+            #Activating the voice assistant
+            self.VoiceActivate = QtWidgets.QPushButton(self)
+            self.VoiceActivate.setGeometry(QtCore.QRect(150, 70, 231, 51))
+            self.VoiceActivate.setDefault(True)
+            self.VoiceActivate.setObjectName("VoiceActivate")
+            self.VoiceActivate.clicked.connect(lambda: [Thread(target=self.Microphone()).start(),self.Reactive_Voice()])
 
-        """
-        Label Predefined Text
-        """
+            #Output box to write down what is being said
+            self.Outputcont = QtWidgets.QTextBrowser(self)
+            self.Outputcont.setGeometry(QtCore.QRect(140, 140, 251, 121))
+            self.Outputcont.setObjectName("Outputcont")
 
-        self.VoiceInstructions.setText("Press the button below to speak to the voice assistant")
-        self.VoiceActivate.setText("Press Me!")
+            """
+            Label Predefined Text
+            """
 
-    def Microphone(self):
-        r = sr.Recognizer()
-        mic = sr.Microphone()
+            self.VoiceInstructions.setText("Press the button below to speak to the voice assistant")
+            self.VoiceActivate.setText("Press Me!")
 
-        r.dynamic_energy_threshold = True
-        
-        output= {
-            'transcription':'None',
-            'Errors': None,
-        }
+        def Microphone(self):
+            r = sr.Recognizer()
+            mic = sr.Microphone()
 
-        with mic as source:
-            try:
-                print("speak now")
-                listen = r.listen(source) # ---> can be condensed into one line
-                output['transcription'] = r.recognize_google(listen)
-                self.Outputcont.append(f"\nUser Said: {output['transcription']}")
-                if output['transcription'] == "clear":
-                    self.Outputcont.clear()
-
-            except sr.UnknownValueError:
-                output['Errors'] = "UnknownValueError"
-                output['transcription'] = "null"
-                self.Outputcont.append("Assistant Said: I didn't catch that! Please try again.")
+            r.dynamic_energy_threshold = True
             
-        self.response = output['transcription']
+            output= {
+                'transcription':'None',
+                'Errors': None,
+            }
 
-        self.Outputcont.append(f"Assistant Said: {self.Responses()}")
+            with mic as source:
+                try:
+                    self.Outputcont.append("Listening...")
+                    QApplication.processEvents()
+                    listen = r.listen(source)
+                    output['transcription'] = r.recognize_google(listen)
+                    self.Outputcont.append(f"\nUser Said: {output['transcription']}")
+                    if output['transcription'] == "clear":
+                        self.Outputcont.clear()
 
-    def upd_meter(self,n):
-        self.ReactiveVoice.setValue(n)
-        
-    def Reactive_Voice(self):
-        self.thread = QThread()
-        self.reactive = update_Progress() #Initiates and moves the object to a thread
-        self.reactive.moveToThread(self.thread)
+                except sr.UnknownValueError:
+                    output['Errors'] = "UnknownValueError"
+                    output['transcription'] = "null"
+                    self.Outputcont.append("Assistant Said: I didn't catch that! Please try again.")
+                
+            self.response = output['transcription']
 
-        self.thread.started.connect(self.reactive.run)
-        self.reactive.complete.connect(self.thread.quit) #When the thread is done the thread is exited
-        self.reactive.complete.connect(self.reactive.deleteLater) #The thread is held in memory until destroyed
-
-        self.thread.finished.connect(self.thread.deleteLater) # Connected to above statement
-        self.reactive.incremental.connect(self.upd_meter) #Connected to the progress bar
-
-        self.thread.start() # Starts the thread
-
-        self.VoiceActivate.setEnabled(False) #Disables the button while the thread is running
-        self.thread.finished.connect(
-            lambda: self.VoiceActivate.setEnabled(True) #Re enables button when the thread is complete
-        )
-
-        self.thread.finished.connect(
-            lambda: self.ReactiveVoice.setValue(0) #Resets the value of the progress bar to zero
-        )
-    
-    def Responses(self):
-        try:
-            test = self.response.split(" ")
-        except:
-            return "No values within the response"
-
-        if "open" in test:
-            if ("Microsoft") and ("Word") in test:
-                os.startfile("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE")
-                return "Opening Word..."
-            elif ("PowerPoint" in test):
-                os.startfile("C:/Program Files/Microsoft Office/root/Office16/POWERPNT.EXE")
-                return "Opening Powerpoint..."
-            elif ("Onenote" or "OneNote") in test:
-                os.startfile("C:/Program Files/Microsoft Office/root\Office16/ONENOTE.EXE")
-                return "Opening OneNote..."
-            elif ("Excel") in test:
-                os.startfile("C:/Program Files/Microsoft Office/root/Office16/EXCEL.EXE")
-                return "Opening Excel"
-            elif ("Spotify") in test:
-                os.startfile("C:/Users/Hasan/AppData/Local/Microsoft/WindowsApps/Spotify.exe")
-            elif ("Chrome") in test:
-                os.startfile("C:/Program Files/Google/Chrome/Application/chrome.exe")
+            if self.Responses() == None:
+                self.Outputcont.append("Assistant Said: My response has not been programmed yet!")
             else:
-                return "Program not found on system"
+                self.Outputcont.append(f"Assistant Said: {self.Responses()}")
 
-    def Reminders_set(self):
+        def upd_meter(self,n):
+            self.ReactiveVoice.setValue(n)
+            
+        def Reactive_Voice(self):
+            self.thread = QThread()
+            self.reactive = update_Progress() #Initiates and moves the object to a thread
+            self.reactive.moveToThread(self.thread)
 
-        return "it works bruh"
+            self.thread.started.connect(self.reactive.run)
+            self.reactive.complete.connect(self.thread.quit) #When the thread is done the thread is exited
+            self.reactive.complete.connect(self.reactive.deleteLater) #The thread is held in memory until destroyed
 
-#----------END OF CLASS---------
+            self.thread.finished.connect(self.thread.deleteLater) # Connected to above statement
+            self.reactive.incremental.connect(self.upd_meter) #Connected to the progress bar
 
+            self.thread.start() # Starts the thread
 
-#----------Twitter Scraper UI----------
-class TwitterScraper(QWidget):
-    keys = []
-    with open('C:/Users/Hasan/Desktop/Live-NEA/keys/twitterAPIkeys.txt','r') as f:
-        for line in f:
-            keys.append(line.rstrip('\n'))
+            self.VoiceActivate.setEnabled(False) #Disables the button while the thread is running
+            self.thread.finished.connect(
+                lambda: self.VoiceActivate.setEnabled(True) #Re enables button when the thread is complete
+            )
 
-    client = tweepy.Client(
-        bearer_token= keys[0],
-        consumer_key= keys[1],
-        consumer_secret= keys[2],
-        access_token= keys[3],
-        access_token_secret= keys[4],
-        )
-
-    def __init__(self):
-        super().__init__()
-        self.setFixedSize(984,412)
-        self.setWindowTitle("Twitter Scraper " + vers_no)
-        self.Twitter_Scraper()
-
-    
-    def Twitter_Scraper(self):
-        #The Return box for all the searches
-        self.Output_Window = QtWidgets.QTextBrowser(self)
-        self.Output_Window.setGeometry(QtCore.QRect(310, 0, 671, 411))
-        self.Output_Window.setObjectName("Output_Window")
-
-        #Label and text box for the twitter handle
-        self.ID_box = QtWidgets.QLineEdit(self)
-        self.ID_box.setGeometry(QtCore.QRect(110, 40, 161, 20))
-        self.ID_box.setObjectName("ID_box")
-
-        self.Handle = QtWidgets.QLabel(self)
-        self.Handle.setGeometry(QtCore.QRect(20, 40, 81, 16))
-        self.Handle.setObjectName("Handle")
-
-
-        #Label and text box for the Search Query
-        self.Query_box = QtWidgets.QLineEdit(self)
-        self.Query_box.setGeometry(QtCore.QRect(110, 70, 161, 20))
-        self.Query_box.setObjectName("Query_box")
-
-        self.Search_Query = QtWidgets.QLabel(self)
-        self.Search_Query.setGeometry(QtCore.QRect(20, 70, 81, 16))
-        self.Search_Query.setObjectName("Search_Query")
-
-        #Optional search by microphone feature
-        self.Mic_Search = QtWidgets.QPushButton(self)
-        self.Mic_Search.setGeometry(QtCore.QRect(280, 70, 21, 23))
-        self.Mic_Search.setText("🎤")
-        self.Mic_Search.setObjectName("Mic_Search")
-
-
-        #Number of searches to be accumulated
-        self.max_results = QtWidgets.QLineEdit(self)
-        self.max_results.setGeometry(QtCore.QRect(110, 100, 81, 20))
-        self.max_results.setObjectName("max_results")
+            self.thread.finished.connect(
+                lambda: self.ReactiveVoice.setValue(0) #Resets the value of the progress bar to zero
+            )
         
-        self.max_results_label = QtWidgets.QLabel(self)
-        self.max_results_label.setGeometry(QtCore.QRect(10, 100, 91, 21))
-        self.max_results_label.setObjectName("max_results_label")
-
-
-        #Submission and logs button
-        self.Submit_req = QtWidgets.QPushButton(self)
-        self.Submit_req.setGeometry(QtCore.QRect(70, 160, 161, 31))
-        self.Submit_req.setObjectName("Submit_req")
-        self.Submit_req.clicked.connect(self.check_type)
-
-        self.req_history = QtWidgets.QPushButton(self)
-        self.req_history.setGeometry(QtCore.QRect(60, 200, 181, 23))
-        self.req_history.setObjectName("req_history")
-
-
-        #Searching by parameters
-        self.Search_by = QtWidgets.QLabel(self)
-        self.Search_by.setGeometry(QtCore.QRect(70, 230, 61, 16))
-        self.Search_by.setObjectName("Search_by")
-
-        self.by_TwitterUser = QtWidgets.QRadioButton(self)
-        self.by_TwitterUser.setGeometry(QtCore.QRect(100, 250, 101, 17))
-        self.by_TwitterUser.setObjectName("by_TwitterUser")
-        self.by_TwitterUser.toggled.connect(self.ToggleSearch)
-        
-        self.by_TwitterAll = QtWidgets.QRadioButton(self)
-        self.by_TwitterAll.setGeometry(QtCore.QRect(100, 270, 121, 17))
-        self.by_TwitterAll.setObjectName("by_TwitterAll")
-
-
-        #Exclusion factors for the search
-        self.Exclusion = QtWidgets.QLabel(self)
-        self.Exclusion.setGeometry(QtCore.QRect(70, 300, 47, 13))
-        self.Exclusion.setObjectName("Exclusion")
-        
-        self.exclu_Retweets = QtWidgets.QCheckBox(self)
-        self.exclu_Retweets.setGeometry(QtCore.QRect(100, 320, 70, 17))
-        self.exclu_Retweets.setObjectName("exclu_Retweets")
-        self.exclu_Retweets.toggled.connect(self.activeExclusion)
-
-        self.Retweets = QtWidgets.QLabel(self)
-        self.Retweets.setGeometry(QtCore.QRect(30,130,241,20))
-        self.Retweets.setText(" ")
-        self.Retweets.setAlignment(QtCore.Qt.AlignCenter)
-        self.Retweets.setStyleSheet(''' color: green; ''')
-
-        """
-        Label Predefined Text
-        """
-
-        self.Handle.setText("Twitter Handle : ")
-        self.Search_Query.setText("Search Query:")
-
-        self.Submit_req.setText("Submit request")
-        self.req_history.setText("Show request history")
-        self.max_results_label.setText("Maximum results:  ")
-
-        self.Search_by.setText("Search By:")
-        self.by_TwitterUser.setText("By Twitter User")
-        self.by_TwitterAll.setText("The Whole of Twitter")
-
-        self.Exclusion.setText("Exclude: ")
-        self.exclu_Retweets.setText("Retweets")
-
-        #Watermarks
-        self.ID_box.setPlaceholderText("Enter a Twitter Handle")
-        self.Query_box.setPlaceholderText("Enter a search")
-        self.max_results.setPlaceholderText("10 to 100")
-
-    def ToggleSearch(self):
-        if self.by_TwitterUser.isChecked():
-            self.Search_Query.hide()
-            self.Query_box.hide()
-            self.Mic_Search.hide()
-        else:
-            self.Search_Query.show()
-            self.Query_box.show()
-            self.Mic_Search.show()
-    
-    def clearEntries(self):
-        self.ID_box.clear()
-        self.Query_box.clear()
-        self.max_results.clear()
-    
-    def activeExclusion(self):
-        if self.exclu_Retweets.isChecked():
-            self.Retweets.setText("Retweets Disabled!")
-        else:
-            self.Retweets.setText(" ")
-    
-    def ID_Grabber(self,client, handle):
-        try:
-            user = str(client.get_user(username= handle))
-            Response = user.split(' ')
-            id = Response[1].removeprefix('id=')
-            return id
-        except:
-            self.Output_Window.append("\nID is invalid")
-
-    def by_User(self):
-        try:
-            if "@" in self.ID_box.text():
-                handle = self.ID_box.text().removeprefix("@")
-                id = self.ID_Grabber(self.client,handle)
-            else:
-                id = self.ID_Grabber(self.client,self.ID_box.text())
-        except:
-            print("400 Bad Response")
-        
-        exclusions = "replies"
-        if self.exclu_Retweets.isChecked():
-            exclusions = "retweets"
-        
-        max_results = 10
-        try:
-            if int(self.max_results.text()) < 10:
-                self.Output_Window.append("\nMax num too low, defaulting to 10")
-            elif int(self.max_results.text()) > 300:
-                self.Output_Window.append("\nmax num too high, defaulting to 10")
-            else:
-                max_results = int(self.max_results.text())
-
-        except ValueError:
-            self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
-
-        if id == None:
-            self.Output_Window.append("Handle Invalid or Blank")
-        else:
+        def Responses(self):
             try:
-                self.Output_Window.append("\n"+"\/"*78)
-                for tweet in tweepy.Paginator(self.client.get_users_tweets, int(id), exclude = exclusions, max_results = 100).flatten(limit = max_results):
-                    self.Output_Window.append(f"\n{tweet}")
-                    self.clearEntries()
-            except tweepy.TweepyException:
-                self.Output_Window.append("Request Invalid or API Tweet Cap Reached")
-    
-    def all_twitter(self):
-        try:
-            query = self.Query_box.text()
-        except:
-            self.Output_Window.append("API cannot parse query")
-        
-        max_results = 10
-        try:
-            if int(self.max_results.text()) < 10:
-                self.Output_Window.append("\nMax num too low, defaulting to 10")
-            elif int(self.max_results.text()) > 300:
-                self.Output_Window.append("\nmax num too high, defaulting to 10")
-            else:
-                max_results = int(self.max_results.text())
-        
-        except ValueError:
-            self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
+                transcription = self.response
+                transcription = transcription.lower().split()
+            except:
+                return "No values within the response"
 
-        self.Output_Window.append("\n"+"\/"*78)
+            if "open" in transcription:
+                if "microsoft" and "word" in transcription:
+                    os.startfile("C:/Program Files/Microsoft Office/root/Office16/WINWORD.EXE")
+                    return "Opening Word..."
+                elif "powerpoint" in transcription:
+                    os.startfile("C:/Program Files/Microsoft Office/root/Office16/POWERPNT.EXE")
+                    return "Opening Powerpoint..."
+                elif "onenote" in transcription:
+                    os.startfile("C:/Program Files/Microsoft Office/root\Office16/ONENOTE.EXE")
+                    return "Opening OneNote..."
+                elif "excel" in transcription:
+                    os.startfile("C:/Program Files/Microsoft Office/root/Office16/EXCEL.EXE")
+                    return "Opening Excel..."
+                elif "spotify" in transcription:
+                    os.startfile("C:/Users/Hasan/AppData/Local/Microsoft/WindowsApps/Spotify.exe")
+                    return "Opening Spotify..."
+                elif "chrome" in transcription:
+                    os.startfile("C:/Program Files/Google/Chrome/Application/chrome.exe")
+                    return "Opening Spotify..."
+                elif "calendar" in transcription: #Write as a failed test (due to system limitations)
+                    os.system("Calendar")
+                else:
+                    return "Program not found on system"
+            
+            if "search" in transcription:
+                transcription.remove("search")
+                if "for" in transcription:
+                    transcription.remove("for")
+                webbrowser.open(f"https://www.google.com/search?q={' '.join(transcription)}")
+                return f"Searching for {' '.join(transcription)}"
 
-        for tweet in tweepy.Paginator(self.client.search_recent_tweets, query, max_results = 100).flatten(limit = max_results):
-            self.Output_Window.append(f"\n{tweet}")
-    
-    def check_type(self):
-
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Something went wrong!")
-        dialog.setStandardButtons(QMessageBox.Ok)
-        dialog.setText("Seems Like You Didn't Choose a 'Search By' Option!")
-
-        if self.by_TwitterUser.isChecked():
-            return self.by_User()
-        
-        elif self.by_TwitterAll.isChecked():
-            return self.all_twitter()
-        
-        else:
-            dialog.exec()
-
+            if ("set" or "add") and "reminder" in transcription:
+                transcription.remove("reminder")
+                if "set" in transcription:
+                    transcription.remove("set")
+                elif "add" in transcription:
+                    transcription.remove("add") 
+                elif transcription == None:
+                    self.Outputcont.append("Whoopsie thats not a reminder!")
+                
+                else:
+                    cur.execute(f"INSERT INTO Reminders Values(null, {self.username}, {' '.join(transcription)});")
 
 #----------END OF CLASS---------
 
 #---------- Tasks and Reminders + Tax calc ----------
-class Reminders(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setFixedSize(842, 415)
-        self.setWindowTitle("Task and Reminders " + vers_no)
-        self.Reminders()
-        self.TaxCalculator()
+    class Reminders(QWidget):
+        def __init__(self,user):
+            super().__init__()
+            self.username = user
+            self.setFixedSize(842, 415)
+            self.setWindowTitle(f"Task and Reminders {vers_no} - Username: {self.username}")
+            self.Reminders()
+            self.TaxCalculator()
 
-    def Reminders(self):
-        self.Vert_Divider = QtWidgets.QFrame(self)
-        self.Vert_Divider.setGeometry(QtCore.QRect(440, 0, 20, 411))
-        self.Vert_Divider.setFrameShape(QtWidgets.QFrame.VLine)
-        self.Vert_Divider.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.Vert_Divider.setObjectName("Vert_Divider")
+        def Reminders(self):
+            self.Vert_Divider = QtWidgets.QFrame(self)
+            self.Vert_Divider.setGeometry(QtCore.QRect(440, 0, 20, 411))
+            self.Vert_Divider.setFrameShape(QtWidgets.QFrame.VLine)
+            self.Vert_Divider.setFrameShadow(QtWidgets.QFrame.Sunken)
+            self.Vert_Divider.setObjectName("Vert_Divider")
 
-        self.Reminders_rect = QtWidgets.QTextBrowser(self)
-        self.Reminders_rect.setGeometry(QtCore.QRect(10, 10, 431, 391))
-        self.Reminders_rect.setObjectName("Reminders_rect")
-    
-    def TaxCalculator(self):
-        self.entry_frame = QtWidgets.QFrame(self)
-        self.entry_frame.setGeometry(QtCore.QRect(480, 90, 341, 111))
-        self.entry_frame.setFrameShape(QtWidgets.QFrame.Box)
-        self.entry_frame.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.entry_frame.setLineWidth(2)
-        self.entry_frame.setObjectName("entry_frame")
-
-
-        self.Tax_Frame = QtWidgets.QFrame(self)
-        self.Tax_Frame.setGeometry(QtCore.QRect(480, 30, 341, 51))
-        self.Tax_Frame.setFrameShape(QtWidgets.QFrame.Box)
-        self.Tax_Frame.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.Tax_Frame.setLineWidth(2)
-        self.Tax_Frame.setObjectName("Tax_Frame")
-
-        self.Tax_BillsLabel = QtWidgets.QLabel(self.Tax_Frame)
-        self.Tax_BillsLabel.setGeometry(QtCore.QRect(0, -1, 341, 51))
-        self.Tax_BillsLabel.setStyleSheet(''' font-size: 20px; ''')
-        self.Tax_BillsLabel.setAlignment(QtCore.Qt.AlignCenter)
-
-
-        self.PPA = QtWidgets.QLabel(self)
-        self.PPA.setGeometry(QtCore.QRect(480, 220, 121, 16))
-        self.PPA.setObjectName("PPA")
-        self.PPA.setStyleSheet(''' font-size: 12px; ''')
+            self.Reminders_rect = QtWidgets.QTextBrowser(self)
+            self.Reminders_rect.setGeometry(QtCore.QRect(10, 10, 431, 391))
+            self.Reminders_rect.setObjectName("Reminders_rect")
         
-        self.per5_tip = QtWidgets.QLabel(self)
-        self.per5_tip.setGeometry(QtCore.QRect(500, 250, 61, 16))
-        self.per5_tip.setObjectName("per5_tip")
-        self.per5_tip.setStyleSheet(''' font-size: 12px; ''')
-
-        self.per10_tip = QtWidgets.QLabel(self)
-        self.per10_tip.setGeometry(QtCore.QRect(500, 280, 61, 16))
-        self.per10_tip.setObjectName("per10_tip")
-        self.per10_tip.setStyleSheet(''' font-size: 12px; ''')
+        def TaxCalculator(self):
+            self.entry_frame = QtWidgets.QFrame(self)
+            self.entry_frame.setGeometry(QtCore.QRect(480, 90, 341, 111))
+            self.entry_frame.setFrameShape(QtWidgets.QFrame.Box)
+            self.entry_frame.setFrameShadow(QtWidgets.QFrame.Raised)
+            self.entry_frame.setLineWidth(2)
+            self.entry_frame.setObjectName("entry_frame")
 
 
-        self.cust_tip = QtWidgets.QLabel(self)
-        self.cust_tip.setGeometry(QtCore.QRect(500, 310, 101, 16))
-        self.cust_tip.setObjectName("cust_tip")
-        self.cust_tip.setStyleSheet(''' font-size: 12px; ''')
+            self.Tax_Frame = QtWidgets.QFrame(self)
+            self.Tax_Frame.setGeometry(QtCore.QRect(480, 30, 341, 51))
+            self.Tax_Frame.setFrameShape(QtWidgets.QFrame.Box)
+            self.Tax_Frame.setFrameShadow(QtWidgets.QFrame.Raised)
+            self.Tax_Frame.setLineWidth(2)
+            self.Tax_Frame.setObjectName("Tax_Frame")
 
-        self.cust_tip_Entry = QtWidgets.QLineEdit(self)
-        self.cust_tip_Entry.setGeometry(QtCore.QRect(630, 310, 113, 20))
-        self.cust_tip_Entry.setObjectName("cust_tip_Entry")
-
-        self.cust_tip_Output = QtWidgets.QLabel(self)
-        self.cust_tip_Output.setGeometry(QtCore.QRect(500, 340, 301, 31))
-        self.cust_tip_Output.setObjectName("cust_tip_Output")
-        self.cust_tip_Output.setStyleSheet(''' font-size: 12px; ''')
-        self.cust_tip_Output.setAlignment(QtCore.Qt.AlignCenter)
-
-        self.cust_submit = QtWidgets.QPushButton(self)
-        self.cust_submit.setGeometry(QtCore.QRect(750, 310, 51, 21))
-        self.cust_submit.setObjectName("cust_Submit")
-
-        self.Tip_entry = QtWidgets.QLineEdit(self)
-        self.Tip_entry.setGeometry(QtCore.QRect(630, 310, 113, 20))
-        self.Tip_entry.setObjectName("Tip_entry")
-        self.Tip_entry.setStyleSheet(''' font-size: 12px; ''')
+            self.Tax_BillsLabel = QtWidgets.QLabel(self.Tax_Frame)
+            self.Tax_BillsLabel.setGeometry(QtCore.QRect(0, -1, 341, 51))
+            self.Tax_BillsLabel.setStyleSheet(''' font-size: 20px; ''')
+            self.Tax_BillsLabel.setAlignment(QtCore.Qt.AlignCenter)
 
 
-        self.PPA_Output = QtWidgets.QLabel(self)
-        self.PPA_Output.setGeometry(QtCore.QRect(630, 220, 91, 16))
-        self.PPA_Output.setObjectName("PPA_Output")
-        self.PPA_Output.setStyleSheet(''' font-size: 12px; ''')
+            self.PPA = QtWidgets.QLabel(self)
+            self.PPA.setGeometry(QtCore.QRect(480, 220, 121, 16))
+            self.PPA.setObjectName("PPA")
+            self.PPA.setStyleSheet(''' font-size: 12px; ''')
+            
+            self.per5_tip = QtWidgets.QLabel(self)
+            self.per5_tip.setGeometry(QtCore.QRect(500, 250, 61, 16))
+            self.per5_tip.setObjectName("per5_tip")
+            self.per5_tip.setStyleSheet(''' font-size: 12px; ''')
 
-        self.per5_tip_Output = QtWidgets.QLabel(self)
-        self.per5_tip_Output.setGeometry(QtCore.QRect(630, 250, 91, 16))
-        self.per5_tip_Output.setObjectName("per5_tip_Output")
-        self.per5_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+            self.per10_tip = QtWidgets.QLabel(self)
+            self.per10_tip.setGeometry(QtCore.QRect(500, 280, 61, 16))
+            self.per10_tip.setObjectName("per10_tip")
+            self.per10_tip.setStyleSheet(''' font-size: 12px; ''')
+
+
+            self.cust_tip = QtWidgets.QLabel(self)
+            self.cust_tip.setGeometry(QtCore.QRect(500, 310, 101, 16))
+            self.cust_tip.setObjectName("cust_tip")
+            self.cust_tip.setStyleSheet(''' font-size: 12px; ''')
+
+            self.cust_tip_Entry = QtWidgets.QLineEdit(self)
+            self.cust_tip_Entry.setGeometry(QtCore.QRect(630, 310, 113, 20))
+            self.cust_tip_Entry.setObjectName("cust_tip_Entry")
+            self.cust_tip_Entry.setStyleSheet(''' font-size: 12px; ''')
+
+            self.cust_tip_Output = QtWidgets.QLabel(self)
+            self.cust_tip_Output.setGeometry(QtCore.QRect(500, 340, 301, 31))
+            self.cust_tip_Output.setObjectName("cust_tip_Output")
+            self.cust_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+            self.cust_tip_Output.setAlignment(QtCore.Qt.AlignCenter)
+
+            self.cust_submit = QtWidgets.QPushButton(self)
+            self.cust_submit.setGeometry(QtCore.QRect(750, 310, 51, 21))
+            self.cust_submit.setObjectName("cust_Submit")
+            self.cust_submit.clicked.connect(self.custom_percent)
+
+
+            self.PPA_Output = QtWidgets.QLabel(self)
+            self.PPA_Output.setGeometry(QtCore.QRect(630, 220, 91, 16))
+            self.PPA_Output.setObjectName("PPA_Output")
+            self.PPA_Output.setStyleSheet(''' font-size: 12px; ''')
+
+            self.per5_tip_Output = QtWidgets.QLabel(self)
+            self.per5_tip_Output.setGeometry(QtCore.QRect(630, 250, 91, 16))
+            self.per5_tip_Output.setObjectName("per5_tip_Output")
+            self.per5_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+            
+            self.per10_tip_Output = QtWidgets.QLabel(self)
+            self.per10_tip_Output.setGeometry(QtCore.QRect(630, 280, 91, 16))
+            self.per10_tip_Output.setObjectName("per10_tip_Output")
+            self.per10_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+
+
+            self.Total = QtWidgets.QLabel(self.entry_frame)
+            self.Total.setGeometry(QtCore.QRect(10, 10, 151, 21))
+            self.Total.setObjectName("Total")
+            self.Total.setStyleSheet(''' font-size: 12px; ''')
+
+            self.Total_Entry = QtWidgets.QLineEdit(self.entry_frame)
+            self.Total_Entry.setGeometry(QtCore.QRect(170, 10, 141, 21))
+            self.Total_Entry.setObjectName("Total_Entry")
+
+            self.Number_Of_People = QtWidgets.QLabel(self.entry_frame)
+            self.Number_Of_People.setGeometry(QtCore.QRect(10, 40, 121, 31))
+            self.Number_Of_People.setObjectName("Number_Of_People")
+            self.Number_Of_People.setStyleSheet(''' font-size: 12px; ''')
+            self.Number_Of_People.setWordWrap(True)
+            self.Number_Of_People.setAlignment(QtCore.Qt.AlignCenter)
+
+            self.No_of_People_Entry = QtWidgets.QLineEdit(self.entry_frame)
+            self.No_of_People_Entry.setGeometry(QtCore.QRect(170, 40, 113, 20))
+            self.No_of_People_Entry.setObjectName("No_of_People_Entry")
+
+            self.Process_Val = QtWidgets.QPushButton(self.entry_frame)
+            self.Process_Val.setGeometry(QtCore.QRect(100, 80, 131, 23))
+            self.Process_Val.setObjectName("Process_Val")
+            self.Process_Val.clicked.connect(self.amounts)
+
+            """
+            Label Predefined Text
+            """
+            self.PPA.setText("Per Person Amount: ")
+
+            self.per5_tip.setText("5% Tip:")
+            self.per10_tip.setText("10% Tip:")
+            self.cust_tip.setText("Custom Tip (%):")
+
+            self.Tax_BillsLabel.setText("Tax/Bills Calculator")
+
+            self.Total.setText("Enter the Total Amount")
+            self.Number_Of_People.setText("Enter the number of people involved: ")
+            self.Process_Val.setText("Process Values")
+
+            self.PPA_Output.setText("-~-")
+            self.per5_tip_Output.setText("-~-")
+            self.per10_tip_Output.setText("-~-")
+
+            self.cust_submit.setText("Submit")
+            self.cust_tip_Output.setText(" Output Will Be Here ")
+
+        def amounts(self):
+            try:
+                Total_am = float(self.Total_Entry.text())
+                No_of_people = int(self.No_of_People_Entry.text())
+
+                calc = (Total_am / No_of_people)
+
+                self.PPA_Output.setText(f"£{'{0:.2f}'.format(calc)}")
+                self.per5_tip_Output.setText(f"£{'{0:.2f}'.format(calc * 0.05)}")
+                self.per10_tip_Output.setText(f"£{'{0:.2f}'.format(calc * 0.10)}")
+
+                self.calc = calc
+
+            except ValueError:
+                self.cust_tip_Output.setText("The values entered does not work")
+
         
-        self.per10_tip_Output = QtWidgets.QLabel(self)
-        self.per10_tip_Output.setGeometry(QtCore.QRect(630, 280, 91, 16))
-        self.per10_tip_Output.setObjectName("per10_tip_Output")
-        self.per10_tip_Output.setStyleSheet(''' font-size: 12px; ''')
+        def custom_percent(self):
+            try:
+                if float(self.cust_tip_Entry.text()) > 100:
+                    self.cust_tip_Output.setStyleSheet(''' color : Red; ''')
+                    self.cust_tip_Output.setText("100 percent is too high")
+                elif float(self.cust_tip_Entry.text()) < 0:
+                    self.cust_tip_Output.setStyleSheet(''' color : Red; ''')
+                    self.cust_tip_Output.setText("Value cannot be below 0%")
+                
+                else:
+                    self.cust_tip_Output.setStyleSheet(''' color: green; font-size: 12px; ''')
+                    self.cust_tip_Output.setText(f"The Custom Tip is: £{'{0:.2f}'.format(self.calc * (float(self.cust_tip_Entry.text())/100))}")
 
-
-        self.Total = QtWidgets.QLabel(self.entry_frame)
-        self.Total.setGeometry(QtCore.QRect(10, 10, 151, 21))
-        self.Total.setObjectName("Total")
-        self.Total.setStyleSheet(''' font-size: 12px; ''')
-
-        self.Total_Entry = QtWidgets.QLineEdit(self.entry_frame)
-        self.Total_Entry.setGeometry(QtCore.QRect(170, 10, 141, 21))
-        self.Total_Entry.setObjectName("Total_Entry")
-
-        self.Number_Of_People = QtWidgets.QLabel(self.entry_frame)
-        self.Number_Of_People.setGeometry(QtCore.QRect(10, 40, 121, 31))
-        self.Number_Of_People.setObjectName("Number_Of_People")
-        self.Number_Of_People.setStyleSheet(''' font-size: 12px; ''')
-        self.Number_Of_People.setWordWrap(True)
-        self.Number_Of_People.setAlignment(QtCore.Qt.AlignCenter)
-
-        self.No_of_People_Entry = QtWidgets.QLineEdit(self.entry_frame)
-        self.No_of_People_Entry.setGeometry(QtCore.QRect(170, 40, 113, 20))
-        self.No_of_People_Entry.setObjectName("No_of_People_Entry")
-
-        self.Process_Val = QtWidgets.QPushButton(self.entry_frame)
-        self.Process_Val.setGeometry(QtCore.QRect(100, 80, 131, 23))
-        self.Process_Val.setObjectName("Process_Val")
-
-        """
-        Label Predefined Text
-        """
-        self.PPA.setText("Per Person Amount: ")
-
-        self.per5_tip.setText("5% Tip:")
-        self.per10_tip.setText("10% Tip:")
-        self.cust_tip.setText("Custom Tip (%):")
-
-        self.Tax_BillsLabel.setText("Tax/Bills Calculator")
-
-        self.Total.setText("Enter the Total Amount")
-        self.Number_Of_People.setText("Enter the number of people involved: ")
-        self.Process_Val.setText("Process Values")
-
-        self.PPA_Output.setText("-~-")
-        self.per5_tip_Output.setText("-~-")
-        self.per10_tip_Output.setText("-~-")
-
-        self.cust_submit.setText("Submit")
-        self.cust_tip_Output.setText(" Output Will Be Here ")
+            
+            except ValueError:
+                self.cust_tip_Output.setText("The input given is invalid")
 
 #----------END OF CLASS----------
 
+#----------Twitter Scraper UI----------
+    class TwitterScraper(QWidget):
+        keys = []
+        with open('C:/Users/Hasan/Desktop/Live-NEA/keys/twitterAPIkeys.txt','r') as f:
+            for line in f:
+                keys.append(line.rstrip('\n'))
+
+        client = tweepy.Client(
+            bearer_token= keys[0],
+            consumer_key= keys[1],
+            consumer_secret= keys[2],
+            access_token= keys[3],
+            access_token_secret= keys[4],
+            )
+
+        def __init__(self,user):
+            super().__init__()
+            self.username = user
+            self.setFixedSize(984,412)
+            self.setWindowTitle(f"Twitter Scraper {vers_no} - Username: {self.username}")
+            self.Twitter_Scraper()
+
+        
+        def Twitter_Scraper(self):
+            #The Return box for all the searches
+            self.Output_Window = QtWidgets.QTextBrowser(self)
+            self.Output_Window.setGeometry(QtCore.QRect(310, 0, 671, 411))
+            self.Output_Window.setObjectName("Output_Window")
+
+            #Label and text box for the twitter handle
+            self.ID_box = QtWidgets.QLineEdit(self)
+            self.ID_box.setGeometry(QtCore.QRect(110, 40, 161, 20))
+            self.ID_box.setObjectName("ID_box")
+
+            self.Handle = QtWidgets.QLabel(self)
+            self.Handle.setGeometry(QtCore.QRect(20, 40, 81, 16))
+            self.Handle.setObjectName("Handle")
+
+
+            #Label and text box for the Search Query
+            self.Query_box = QtWidgets.QLineEdit(self)
+            self.Query_box.setGeometry(QtCore.QRect(110, 70, 161, 20))
+            self.Query_box.setObjectName("Query_box")
+
+            self.Search_Query = QtWidgets.QLabel(self)
+            self.Search_Query.setGeometry(QtCore.QRect(20, 70, 81, 16))
+            self.Search_Query.setObjectName("Search_Query")
+
+            #Optional search by microphone feature
+            self.Mic_Search = QtWidgets.QPushButton(self)
+            self.Mic_Search.setGeometry(QtCore.QRect(280, 70, 21, 23))
+            self.Mic_Search.setText("🎤")
+            self.Mic_Search.setObjectName("Mic_Search")
+            self.Mic_Search.clicked.connect(lambda: [self.mic_search()])
+
+
+            #Number of searches to be accumulated
+            self.max_results = QtWidgets.QLineEdit(self)
+            self.max_results.setGeometry(QtCore.QRect(110, 100, 81, 20))
+            self.max_results.setObjectName("max_results")
+            
+            self.max_results_label = QtWidgets.QLabel(self)
+            self.max_results_label.setGeometry(QtCore.QRect(10, 100, 91, 21))
+            self.max_results_label.setObjectName("max_results_label")
+
+
+            #Submission and logs button
+            self.Submit_req = QtWidgets.QPushButton(self)
+            self.Submit_req.setGeometry(QtCore.QRect(70, 160, 161, 31))
+            self.Submit_req.setObjectName("Submit_req")
+            self.Submit_req.clicked.connect(self.check_type)
+
+            self.req_history = QtWidgets.QPushButton(self)
+            self.req_history.setGeometry(QtCore.QRect(60, 200, 181, 23))
+            self.req_history.setObjectName("req_history")
+
+
+            #Searching by parameters
+            self.Search_by = QtWidgets.QLabel(self)
+            self.Search_by.setGeometry(QtCore.QRect(70, 230, 61, 16))
+            self.Search_by.setObjectName("Search_by")
+
+            self.by_TwitterUser = QtWidgets.QRadioButton(self)
+            self.by_TwitterUser.setGeometry(QtCore.QRect(100, 250, 101, 17))
+            self.by_TwitterUser.setObjectName("by_TwitterUser")
+            self.by_TwitterUser.toggled.connect(self.ToggleSearch)
+            
+            self.by_TwitterAll = QtWidgets.QRadioButton(self)
+            self.by_TwitterAll.setGeometry(QtCore.QRect(100, 270, 121, 17))
+            self.by_TwitterAll.setObjectName("by_TwitterAll")
+
+
+            #Exclusion factors for the search
+            self.Exclusion = QtWidgets.QLabel(self)
+            self.Exclusion.setGeometry(QtCore.QRect(70, 300, 47, 13))
+            self.Exclusion.setObjectName("Exclusion")
+            
+            self.exclu_Retweets = QtWidgets.QCheckBox(self)
+            self.exclu_Retweets.setGeometry(QtCore.QRect(100, 320, 70, 17))
+            self.exclu_Retweets.setObjectName("exclu_Retweets")
+            self.exclu_Retweets.toggled.connect(self.activeExclusion)
+
+            self.Retweets = QtWidgets.QLabel(self)
+            self.Retweets.setGeometry(QtCore.QRect(30,130,241,20))
+            self.Retweets.setText(" ")
+            self.Retweets.setAlignment(QtCore.Qt.AlignCenter)
+            self.Retweets.setStyleSheet(''' color: green; ''')
+
+            """
+            Label Predefined Text
+            """
+
+            self.Handle.setText("Twitter Handle : ")
+            self.Search_Query.setText("Search Query:")
+
+            self.Submit_req.setText("Submit request")
+            self.req_history.setText("Show request history")
+            self.max_results_label.setText("Maximum results:  ")
+
+            self.Search_by.setText("Search By:")
+            self.by_TwitterUser.setText("By Twitter User")
+            self.by_TwitterAll.setText("The Whole of Twitter")
+
+            self.Exclusion.setText("Exclude: ")
+            self.exclu_Retweets.setText("Retweets")
+
+            #Watermarks
+            self.ID_box.setPlaceholderText("Enter a Twitter Handle")
+            self.Query_box.setPlaceholderText("Enter a search")
+            self.max_results.setPlaceholderText("10 to 100")
+
+        def ToggleSearch(self):
+            if self.by_TwitterUser.isChecked():
+                self.Search_Query.hide()
+                self.Query_box.hide()
+                self.Mic_Search.hide()
+            else:
+                self.Search_Query.show()
+                self.Query_box.show()
+                self.Mic_Search.show()
+        
+        def clearEntries(self):
+            self.ID_box.clear()
+            self.Query_box.clear()
+            self.max_results.clear()
+        
+        def activeExclusion(self):
+            if self.exclu_Retweets.isChecked():
+                self.Retweets.setText("Retweets Disabled!")
+            else:
+                self.Retweets.setText(" ")
+        
+        def ID_Grabber(self,client, handle):
+            try:
+                user = str(client.get_user(username= handle))
+                Response = user.split(' ')
+                id = Response[1].removeprefix('id=')
+                return id
+            except:
+                self.Output_Window.append("\nID is invalid")
+
+        def by_User(self):
+            try:
+                if "@" in self.ID_box.text():
+                    handle = self.ID_box.text().removeprefix("@")
+                    id = self.ID_Grabber(self.client,handle)
+                else:
+                    id = self.ID_Grabber(self.client,self.ID_box.text())
+            except:
+                print("400 Bad Response")
+            
+            exclusions = "replies"
+            if self.exclu_Retweets.isChecked():
+                exclusions = "retweets"
+            
+            max_results = 10
+            try:
+                if int(self.max_results.text()) < 10:
+                    self.Output_Window.append("\nMax num too low, defaulting to 10")
+                elif int(self.max_results.text()) > 300:
+                    self.Output_Window.append("\nmax num too high, defaulting to 10")
+                else:
+                    max_results = int(self.max_results.text())
+
+            except ValueError:
+                self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
+
+            if id == None:
+                self.Output_Window.append("Handle Invalid or Blank")
+            else:
+                try:
+                    self.Output_Window.append("\n"+"\/"*78)
+                    self.Output_Window.append(f"Twitter Handle:{self.ID_box.text()}, Results Requested:{max_results}")
+                    for tweet in tweepy.Paginator(self.client.get_users_tweets, int(id), exclude = exclusions, max_results = 100).flatten(limit = max_results):
+                        self.Output_Window.append(f"\n{tweet}")
+                        self.clearEntries()
+                except tweepy.TweepyException:
+                    self.Output_Window.append("Request Invalid or API Tweet Cap Reached")
+        
+        def all_twitter(self):
+            try:
+                query = self.Query_box.text()
+            except:
+                self.Output_Window.append("API cannot parse query")
+            
+            max_results = 10
+            try:
+                if int(self.max_results.text()) < 10:
+                    self.Output_Window.append("\nMax num too low, defaulting to 10")
+                elif int(self.max_results.text()) > 300:
+                    self.Output_Window.append("\nmax num too high, defaulting to 10")
+                else:
+                    max_results = int(self.max_results.text())
+            
+            except ValueError:
+                self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
+
+            self.Output_Window.append("\n"+"\/"*78)
+
+            for tweet in tweepy.Paginator(self.client.search_recent_tweets, query, max_results = 100).flatten(limit = max_results):
+                self.Output_Window.append(f"\n{tweet}")
+        
+        def mic_search(self):
+            self.Output_Window.append("Listening...")
+            self.Query_box.setText(" ")
+            r = sr.Recognizer()
+            mic = sr.Microphone()
+
+            r.dynamic_energy_threshold = True
+            
+            output= {
+                'transcription':'None',
+                'Errors': None,
+            }
+
+            QApplication.processEvents()
+            with mic as source:
+                try:
+                    listen = r.listen(source)
+                    output['transcription'] = r.recognize_google(listen)
+                    self.Query_box.setText(output['transcription'])
+
+                except sr.UnknownValueError:
+                    self.Output_Window.append("I couldn't understand that, try again")
+            
+        
+        def check_type(self):
+
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("Something went wrong!")
+            dialog.setStandardButtons(QMessageBox.Ok)
+            dialog.setText("Seems Like You Didn't Choose a 'Search By' Option!")
+
+            if self.by_TwitterUser.isChecked():
+                return self.by_User()
+            
+            elif self.by_TwitterAll.isChecked():
+                return self.all_twitter()
+            
+            else:
+                dialog.exec()
+
+
+#----------END OF CLASS---------
 
 def window():
     app = QApplication(sys.argv)
