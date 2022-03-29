@@ -13,7 +13,6 @@ import pyttsx3 # <-- Used to convert text to speech
 import tweepy # <-- Twitter Scraping Library to harvest information from a page
 import datetime # <-- Used to check the date and time
 import time # <-- Will be used for delays 
-import requests # <-- Used for accessing web information and relaying it to the program
 import hashlib # <-- Used to encrypt and decrypt passwords using hashes
 
 """
@@ -499,7 +498,7 @@ class MainPage(QWidget):
                 
             self.response = output['transcription']
 
-            if self.Responses() == None:
+            if self.Responses == None:
                 self.Outputcont.append("Assistant Said: My response has not been programmed yet!")
             else:
                 self.Outputcont.append(f"Assistant Said: {self.Responses()}")
@@ -534,6 +533,7 @@ class MainPage(QWidget):
             try:
                 transcription = self.response
                 transcription = transcription.lower().split()
+                #print(transcription)
             except:
                 return "No values within the response"
 
@@ -561,25 +561,64 @@ class MainPage(QWidget):
                 else:
                     return "Program not found on system"
             
-            if "search" in transcription:
+            elif "search" in transcription:
                 transcription.remove("search")
                 if "for" in transcription:
                     transcription.remove("for")
                 webbrowser.open(f"https://www.google.com/search?q={' '.join(transcription)}")
                 return f"Searching for {' '.join(transcription)}"
 
-            if ("set" or "add") and "reminder" in transcription:
-                transcription.remove("reminder")
-                if "set" in transcription:
-                    transcription.remove("set")
-                elif "add" in transcription:
-                    transcription.remove("add") 
-                elif transcription == None:
-                    self.Outputcont.append("Whoopsie thats not a reminder!")
-                
-                else:
-                    cur.execute(f"INSERT INTO Reminders Values(null, {self.username}, {' '.join(transcription)});")
+            elif "add" and "reminder" in transcription:
+                try:
+                    transcription.remove("reminder")
+                    if "add" in transcription:
+                        transcription.remove("add")
+                        if "a" in transcription:
+                            transcription.remove("a")
+                        else:
+                            pass
+                    elif transcription == None:
+                        self.Outputcont.append("Whoopsie that's not a reminder!")
+                    
+                    cur.execute(f'INSERT INTO Reminders Values(null, "{self.username}", "{" ".join(transcription)}");')
+                    con.commit()
+                    return "Reminder Added!"
+                except:
+                    return "I didn't understand that! Maybe my response has not been programmed yet."
+            
+            elif "set" and "lights" in transcription:
+                if "colour" in transcription:
+                    colours = {
+                    'red' : 360, 'pink': 330,
+                    'magenta': 300, 'purple': 270,
+                    'blue': 240, 'turquoise': 210,
+                    'teal' : 180, 'seagreen': 150,
+                    'green': 120, 'lime': 90,
+                    'yellow': 60, 'orange': 30
+                    }
 
+                    temp_lst = []
+                    temp_lst.clear()
+                    for i in transcription:
+                        if i in colours:
+                            temp_lst.append(i)
+                    
+                    self.l530.setBrightness(100) #Sends the set brightness request
+                    self.l530.setColorTemp(2700) #Sets the colour temperature to 2700 Kelvin (Warm White)
+                    self.l530.setColor(colours[f"{temp_lst[0]}"], 100) #Sends the set colour request from 0 -> 360 degrees for hue
+
+                    return f"Changing Light Colour to {temp_lst[0]}"
+                
+                elif "brightness" in transcription:
+                    num_lst = []
+                    num_lst.clear()
+                    for i in range(100):
+                        if str(i) in transcription:
+                            num_lst.append(i)
+                    
+                    self.l530.setBrightness(num_lst[0])
+                    
+                    return f"Setting the brightness to: {num_lst[0]}"
 #----------END OF CLASS---------
 
 #---------- Tasks and Reminders + Tax calc ----------
@@ -598,10 +637,26 @@ class MainPage(QWidget):
             self.Vert_Divider.setFrameShape(QtWidgets.QFrame.VLine)
             self.Vert_Divider.setFrameShadow(QtWidgets.QFrame.Sunken)
             self.Vert_Divider.setObjectName("Vert_Divider")
-
+        
             self.Reminders_rect = QtWidgets.QTextBrowser(self)
             self.Reminders_rect.setGeometry(QtCore.QRect(10, 10, 431, 391))
             self.Reminders_rect.setObjectName("Reminders_rect")
+
+            try:
+                cur.execute(f'SELECT Reminder FROM Reminders WHERE Username = "{self.username}";')
+                
+                reminders = cur.fetchall()
+                self.Reminders_rect.setAlignment(QtCore.Qt.AlignCenter)
+                self.Reminders_rect.append("---------- Reminders ----------")
+                self.Reminders_rect.setStyleSheet(''' font-size: 18px; ''')
+                counter = 1
+                for reminder in reminders:
+                    self.Reminders_rect.append(f"{counter}: {reminder[0]}")
+                    counter += 1
+
+            except:
+                self.Reminders_rect.setStyleSheet(''' font-size: 18px; ''')
+                self.Reminders_rect.append("There are no reminders currently within the system, you can create some in the Voice Assistant!")
         
         def TaxCalculator(self):
             self.entry_frame = QtWidgets.QFrame(self)
