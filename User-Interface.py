@@ -9,23 +9,10 @@ import os # <-- Used to open applications on the system and manage files
 from PyP100 import PyL530 # <-- Used to control smart peripherals and devices
 import sqlite3 # <-- Used to manage and create databases
 import webbrowser # <-- Used as a web based library to visually represent information
-import pyttsx3 # <-- Used to convert text to speech
 import tweepy # <-- Twitter Scraping Library to harvest information from a page
 import datetime # <-- Used to check the date and time
 import time # <-- Will be used for delays 
 import hashlib # <-- Used to encrypt and decrypt passwords using hashes
-
-"""
-- Log Tweepy results to an external text file with the file name inclu. -> Firstname, Surname, UserID and "Log of Tweepy results" 
-- Fight a fuckin bear
-- Do the Voice Assistant commands that you said in the analysis, write them outside of the voice assistant object i.e. in the VA class
-- Slap in the PyP100 and integrate it into the VA, comments are in the test file for PyP100
-- Make pyttsx3 useful, reads out the voice assistant commands only, the ones returned
-- Ability to sort folders
-- Calculating bills and taxation, reminders system (one section?) - decide 19/03/2022
-- Playing music and sending messages (Try to make, if not then say time constraint limitation in eval)
-"""
-
 
 #--- Smaller Variables ---
 vers_no = str("3.0")
@@ -55,6 +42,7 @@ cur.execute('''CREATE TABLE IF NOT EXISTS Reminders(
     );''')
 
 con.commit()
+
 
 #----------Login Page (Finished)----------
 class LoginPage(QMainWindow):
@@ -156,6 +144,7 @@ class LoginPage(QMainWindow):
         self.Username_input.setPlaceholderText("Enter your Username")
         self.Password_input.setPlaceholderText("Enter a Valid Password")
 #----------END OF CLASS----------
+
 
 #----------Registration Page----------
 class Register(QWidget):
@@ -418,6 +407,7 @@ class MainPage(QWidget):
         self.Tr.show()
 #---------- END OF CLASS ----------
 
+
 #----------Voice Assistant UI----------
     class VoiceAssistant(QWidget):
         def __init__(self, user):
@@ -621,6 +611,7 @@ class MainPage(QWidget):
                     return f"Setting the brightness to: {num_lst[0]}"
 #----------END OF CLASS---------
 
+
 #---------- Tasks and Reminders + Tax calc ----------
     class Reminders(QWidget):
         def __init__(self,user):
@@ -817,6 +808,7 @@ class MainPage(QWidget):
 
 #----------END OF CLASS----------
 
+
 #----------Twitter Scraper UI----------
     class TwitterScraper(QWidget):
         keys = []
@@ -892,6 +884,7 @@ class MainPage(QWidget):
             self.req_history = QtWidgets.QPushButton(self)
             self.req_history.setGeometry(QtCore.QRect(60, 200, 181, 23))
             self.req_history.setObjectName("req_history")
+            self.req_history.clicked.connect(self.logs)
 
 
             #Searching by parameters
@@ -979,6 +972,7 @@ class MainPage(QWidget):
                 self.Output_Window.append("\nID is invalid")
 
         def by_User(self):
+            log = open("Twitter_Logs.txt","a")
             try:
                 if "@" in self.ID_box.text():
                     handle = self.ID_box.text().removeprefix("@")
@@ -1010,11 +1004,18 @@ class MainPage(QWidget):
                 try:
                     self.Output_Window.append("\n"+"\/"*78)
                     self.Output_Window.append(f"Twitter Handle:{self.ID_box.text()}, Results Requested:{max_results}")
+
+                    log.write(f"\nUsername: {self.username}, Max Results: {max_results}, Username: {self.ID_box.text()}")
+
                     for tweet in tweepy.Paginator(self.client.get_users_tweets, int(id), exclude = exclusions, max_results = 100).flatten(limit = max_results):
                         self.Output_Window.append(f"\n{tweet}")
+                        log.write(f"\n{tweet}")
                         self.clearEntries()
+
                 except tweepy.TweepyException:
                     self.Output_Window.append("Request Invalid or API Tweet Cap Reached")
+            
+            log.close()
         
         def all_twitter(self):
             try:
@@ -1035,10 +1036,11 @@ class MainPage(QWidget):
                 self.Output_Window.append("The Maximum Number is invalid: Max Results defaulted to 10")
 
             self.Output_Window.append("\n"+"\/"*78)
+            self.Output_Window.append(f"Search Query:{self.Query_box.text()}, Results Requested:{max_results}")
 
             for tweet in tweepy.Paginator(self.client.search_recent_tweets, query, max_results = 100).flatten(limit = max_results):
                 self.Output_Window.append(f"\n{tweet}")
-        
+                
         def mic_search(self):
             self.Output_Window.append("Listening...")
             self.Query_box.setText(" ")
@@ -1078,6 +1080,13 @@ class MainPage(QWidget):
             
             else:
                 dialog.exec()
+        
+        def logs(self):
+            try:
+                os.startfile("C:/Users/Hasan/Desktop/Live-NEA/Twitter_Logs.txt")
+            except:
+                self.Output_Window.append("\nThe File does not exist yet")
+            
 
 
 #----------END OF CLASS---------
